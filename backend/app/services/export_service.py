@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from app.core.config import Settings, get_settings
+from app.schemas.text_region import TextRegion
 from app.services.chapter_context_service import (
     ChapterContextNotFoundError,
     ChapterContextService,
@@ -51,6 +52,12 @@ class ExportService:
         self.chapter_context_service = (
             chapter_context_service or ChapterContextService(settings=self.settings)
         )
+        self.excluded_text_types = set(self.settings.EXPORT_EXCLUDED_TEXT_TYPES)
+
+    def _exported_texts(self, texts: list[TextRegion]) -> list[TextRegion]:
+        """Texts to export in reading order, without EXPORT_EXCLUDED_TEXT_TYPES (e.g. SFX)."""
+        kept = [tx for tx in texts if tx.type not in self.excluded_text_types]
+        return sorted(kept, key=lambda t: t.order)
 
     def export_json(self, chapter_id: str, save_to_file: bool = True) -> dict[str, Any]:
         """Generate complete structured JSON export of chapter and all pages."""
@@ -69,11 +76,15 @@ class ExportService:
         pages_data: list[dict[str, Any]] = []
         for p in chapter.pages:
             detail = self.chapter_service.get_page(chapter_id, p.page_number)
+            context = None
+            if detail.context:
+                context = detail.context.model_dump()
+                context["texts"] = [tx.model_dump() for tx in self._exported_texts(detail.context.texts)]
             page_dict: dict[str, Any] = {
                 "page_number": detail.page_number,
                 "filename": detail.filename,
                 "status": detail.status,
-                "context": detail.context.model_dump() if detail.context else None,
+                "context": context,
             }
             if detail.error_message:
                 page_dict["error"] = detail.error_message
@@ -90,6 +101,7 @@ class ExportService:
             "updated_at": chapter.updated_at,
             "characters_roster": [c.model_dump() for c in known_characters],
             "chapter_context": chapter_context,
+            "excluded_text_types": sorted(self.excluded_text_types),
             "pages": pages_data,
         }
 
@@ -232,13 +244,14 @@ class ExportService:
 
             # Dialogue / Text
             lines.append("TEXT")
-            if ctx.texts:
-                sorted_texts = sorted(ctx.texts, key=lambda t: t.order)
-                for tx in sorted_texts:
+            texts = self._exported_texts(ctx.texts)
+            if texts:
+                # Numbered by position so excluded texts leave no gaps
+                for number, tx in enumerate(texts, start=1):
                     speaker = tx.speaker or "Unknown"
                     target_str = f" → {tx.target}" if tx.target else ""
                     type_str = f" [{tx.type}]" if tx.type and tx.type not in ("speech", "sp") else ""
-                    lines.append(f"[{tx.order}] {speaker}{target_str}{type_str}")
+                    lines.append(f"[{number}] {speaker}{target_str}{type_str}")
                     lines.append(f'"{tx.text}"')
                     lines.append("")
             else:

@@ -168,6 +168,38 @@ class OllamaService:
         except httpx.RequestError as exc:
             raise OllamaConnectionError(f"Connection error while listing models from {self.host}: {exc}") from exc
 
+    async def show_model(self, model: str | None = None) -> dict[str, Any]:
+        """Fetch model metadata from /api/show (includes `capabilities`, e.g. "vision")."""
+        target_model = model or self.model
+        try:
+            response = await self._client.post("/api/show", json={"model": target_model})
+        except httpx.TimeoutException as exc:
+            raise OllamaTimeoutError(f"Request timed out while showing model '{target_model}'") from exc
+        except httpx.RequestError as exc:
+            raise OllamaConnectionError(f"Connection error while showing model '{target_model}': {exc}") from exc
+
+        if response.status_code == 404:
+            raise OllamaModelNotFoundError(
+                f"Model '{target_model}' not found on Ollama server",
+                status_code=404,
+                response_body=response.text,
+            )
+        if response.status_code != 200:
+            raise OllamaResponseError(
+                f"Failed to show model '{target_model}' (HTTP {response.status_code})",
+                status_code=response.status_code,
+                response_body=response.text,
+            )
+        return response.json()
+
+    async def supports_vision(self, model: str | None = None) -> bool | None:
+        """True/False if the host reports model capabilities, None if it doesn't say."""
+        info = await self.show_model(model)
+        capabilities = info.get("capabilities")
+        if not isinstance(capabilities, list):
+            return None
+        return "vision" in capabilities
+
     async def generate(
         self,
         prompt: str,

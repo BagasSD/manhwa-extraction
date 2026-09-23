@@ -192,12 +192,15 @@ class BatchService:
                         page_num=page_num,
                         known_characters=known_characters,
                         chapter_id=chapter_id,
-                        preprocess_mode="original",
+                        preprocess_mode=self.settings.EXTRACTION_PREPROCESS_MODE,
                         max_retries=request.max_retries_per_page,
                     )
 
                     job.completed_pages += 1
                     job.processed_pages += 1
+                    # Saved, but still suspicious after all retries (e.g. missed text)
+                    if result.page_context.review_flags:
+                        job.manual_review_pages += 1
 
                     # Propagate new characters to downstream pages
                     for ch in result.page_context.characters:
@@ -225,7 +228,7 @@ class BatchService:
                 job.current_page = None
                 job.message = (
                     f"Batch processing completed: {job.completed_pages} succeeded, "
-                    f"{job.failed_pages} need manual review."
+                    f"{job.manual_review_pages} need manual review."
                 )
             job.completed_at = datetime.now(timezone.utc).isoformat()
 
@@ -240,10 +243,10 @@ class BatchService:
         self,
         chapter_id: str,
         page_num: int,
-        preprocess_mode: str = "original",
+        preprocess_mode: str | None = None,
         max_retries: int = 2,
     ) -> PageDetail:
-        """Extract a single page and persist results."""
+        """Extract a single page and persist results (default mode: EXTRACTION_PREPROCESS_MODE)."""
         page = self.chapter_service.get_page(chapter_id, page_num)
         known_chars = self.character_service.get_known_characters_dict(chapter_id)
 
@@ -253,7 +256,7 @@ class BatchService:
                 page_num=page_num,
                 known_characters=known_chars,
                 chapter_id=chapter_id,
-                preprocess_mode=preprocess_mode,
+                preprocess_mode=preprocess_mode or self.settings.EXTRACTION_PREPROCESS_MODE,
                 max_retries=max_retries,
             )
             return self.chapter_service.get_page(chapter_id, page_num)

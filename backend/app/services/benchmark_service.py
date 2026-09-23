@@ -9,6 +9,13 @@ can inject a mock OllamaService.
 Benchmark modes (PRD §15.1):
   A: Full page → Gemma (original)
   B: Full page + preprocessing → Gemma (enhanced, contrast, grayscale, …)
+  C: Crop + upscale → Gemma (tiled)
+
+Text recall: an `expected.json` next to the fixtures (in the fixture root or a
+category subfolder) lists the ground-truth texts per image, e.g.
+  {"page-001.png": {"texts": ["Don't leave!"]}}
+Each run then reports how many of those texts were captured, so a prompt or
+preprocessing change can be compared before/after on the same fixed set.
 """
 
 from __future__ import annotations
@@ -16,8 +23,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 import uuid
+from difflib import SequenceMatcher
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -39,6 +48,11 @@ logger = logging.getLogger(__name__)
 
 # Image extensions accepted as fixture images
 _IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
+EXPECTED_TEXTS_FILENAME = "expected.json"
+# Minimum similarity for an extracted text to count as a ground-truth match
+# (tolerates small OCR slips such as a missing apostrophe).
+_TEXT_MATCH_RATIO = 0.8
+_NON_WORD_RE = re.compile(r"[^\w]+", re.UNICODE)
 
 
 class BenchmarkService:
@@ -71,6 +85,7 @@ class BenchmarkService:
         # Resolve fixture directory
         fixture_path = self._resolve_fixture_dir(request.fixture_dir)
         fixture_images = self._collect_fixtures(fixture_path, request.max_pages)
+        expected_texts = self._load_expected_texts(fixture_path)
 
         logger.info(
             f"Benchmark run={run_id}: {len(fixture_images)} image(s), "
@@ -82,7 +97,7 @@ class BenchmarkService:
 
         for mode in request.modes:
             for img_path in fixture_images:
-                result = await self._benchmark_single(img_path, mode, fixture_path)
+                result = await self._benchmark_single(img_path, mode, fixture_path, expected_texts)
                 page_results.append(result)
 
         # Compute per-mode summaries
@@ -165,14 +180,75 @@ class BenchmarkService:
 
         return images
 
+    @staticmethod
+    def _load_expected_texts(fixture_path: Path) -> dict[str, list[str]]:
+        """Read ground-truth texts from expected.json in the root and category subfolders.
+
+        Keys in the result are image paths relative to `fixture_path` (POSIX style).
+        """
+        manifests = [fixture_path / EXPECTED_TEXTS_FILENAME]
+        if fixture_path.is_dir():
+            manifests += [sub / EXPECTED_TEXTS_FILENAME for sub in sorted(fixture_path.iterdir()) if sub.is_dir()]
+
+        expected: dict[str, list[str]] = {}
+        for manifest in manifests:
+            if not manifest.is_file():
+                continue
+            try:
+                data = json.loads(manifest.read_text(encoding="utf-8"))
+            except Exception as exc:
+                logger.warning(f"Ignoring unreadable {manifest}: {exc}")
+                continue
+            prefix = manifest.parent.relative_to(fixture_path).as_posix()
+            for name, entry in data.items():
+                texts = entry.get("texts") if isinstance(entry, dict) else None
+                if isinstance(texts, list):
+                    key = name if prefix == "." else f"{prefix}/{name}"
+                    expected[key] = [str(t) for t in texts]
+        return expected
+
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        return _NON_WORD_RE.sub(" ", text.casefold()).strip()
+
+    @classmethod
+    def count_matched_texts(cls, expected: list[str], extracted: list[str]) -> int:
+        """Count ground-truth texts present in the extraction (fuzzy, order-independent)."""
+        extracted_norm = [cls._normalize_text(t) for t in extracted if t.strip()]
+        joined = " ".join(extracted_norm)
+        matched = 0
+        for text in expected:
+            target = cls._normalize_text(text)
+            if not target:
+                continue
+            if target in joined or any(
+                SequenceMatcher(None, target, cand).ratio() >= _TEXT_MATCH_RATIO for cand in extracted_norm
+            ):
+                matched += 1
+        return matched
+
+    @classmethod
+    def _recall_fields(cls, expected: list[str] | None, extracted: list[str]) -> dict[str, Any]:
+        """Ground-truth comparison fields for a PageBenchmarkResult."""
+        if expected is None:
+            return {}
+        matched = cls.count_matched_texts(expected, extracted)
+        return {
+            "expected_text_count": len(expected),
+            "matched_text_count": matched,
+            "text_recall": matched / len(expected) if expected else None,
+        }
+
     async def _benchmark_single(
         self,
         img_path: Path,
         mode: PreprocessMode,
         fixture_root: Path,
+        expected_texts: dict[str, list[str]] | None = None,
     ) -> PageBenchmarkResult:
         """Run extraction on one image with one preprocessing mode."""
-        rel_path = str(img_path.relative_to(fixture_root)) if img_path.is_relative_to(fixture_root) else img_path.name
+        rel_path = img_path.relative_to(fixture_root).as_posix() if img_path.is_relative_to(fixture_root) else img_path.name
+        expected = (expected_texts or {}).get(rel_path)
         t0 = time.perf_counter()
 
         try:
@@ -215,6 +291,8 @@ class BenchmarkService:
                 has_scene=result.page_context.scene is not None,
                 error=None,
                 raw_response_size=raw_size,
+                flagged=bool(result.page_context.review_flags),
+                **self._recall_fields(expected, [t.text for t in result.page_context.texts]),
             )
 
         except OllamaError as exc:
@@ -227,6 +305,7 @@ class BenchmarkService:
                 processing_time_ms=elapsed,
                 attempts=3,
                 error=f"OllamaError: {exc}",
+                **self._recall_fields(expected, []),
             )
         except Exception as exc:
             elapsed = (time.perf_counter() - t0) * 1000
@@ -238,6 +317,7 @@ class BenchmarkService:
                 processing_time_ms=elapsed,
                 attempts=3,
                 error=str(exc),
+                **self._recall_fields(expected, []),
             )
 
     # ------------------------------------------------------------------
@@ -277,6 +357,13 @@ class BenchmarkService:
         retry_rate = retry_count / total
         avg_chars = sum(r.character_count for r in results) / total
         avg_texts = sum(r.text_count for r in results) / total
+        recalls = [r.text_recall for r in results if r.text_recall is not None]
+        avg_recall = round(sum(recalls) / len(recalls), 4) if recalls else None
+        missed_text_pages = sum(1 for r in results if r.expected_text_count and r.text_count == 0)
+        hallucinated_text_pages = sum(
+            1 for r in results if r.success and r.expected_text_count == 0 and r.text_count > 0
+        )
+        flagged_pages = sum(1 for r in results if r.flagged)
 
         return ModeSummary(
             mode=mode,
@@ -290,24 +377,32 @@ class BenchmarkService:
             avg_character_count=round(avg_chars, 2),
             avg_text_count=round(avg_texts, 2),
             retry_rate=round(retry_rate, 4),
+            avg_text_recall=avg_recall,
+            missed_text_pages=missed_text_pages,
+            hallucinated_text_pages=hallucinated_text_pages,
+            flagged_pages=flagged_pages,
         )
 
     @staticmethod
     def _pick_recommended_mode(
         summaries: list[ModeSummary],
     ) -> PreprocessMode | None:
-        """Pick the mode with the best validity rate; break ties by speed.
+        """Pick the mode that captures the most text, then the best validity rate, then speed.
 
-        Returns None when no pages were tested.
+        Text recall only counts when the fixtures have ground truth. Returns
+        None when no pages were tested.
         """
         valid = [s for s in summaries if s.total_pages > 0]
         if not valid:
             return None
 
-        # Primary: highest validity rate; secondary: lowest avg processing time
         best = max(
             valid,
-            key=lambda s: (s.json_validity_rate, -s.avg_processing_time_ms),
+            key=lambda s: (
+                s.avg_text_recall if s.avg_text_recall is not None else -1.0,
+                s.json_validity_rate,
+                -s.avg_processing_time_ms,
+            ),
         )
         return best.mode
 

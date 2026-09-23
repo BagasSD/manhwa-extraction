@@ -53,6 +53,12 @@ running — this is the Phase 0 smoke test built into `src/App.tsx`.
 | `OLLAMA_THINK` | `false` | backend (Phase 1+) |
 | `OLLAMA_TEMPERATURE` | `0` | backend (Phase 1+) |
 | `OLLAMA_VISUAL_TOKENS` | `1120` | backend (Phase 1+) |
+| `EXTRACTION_PREPROCESS_MODE` | `original` | backend: default preprocessing (`tiled` = crop + upscale) |
+| `EXTRACTION_STRUCTURED_OUTPUT` | `true` | backend: send the page JSON schema as Ollama `format` |
+| `EXTRACTION_MAX_TEMPERATURE` | `0.2` | backend: temperature cap for page extraction |
+| `EXTRACTION_TILE_MAX_SEGMENTS` | `8` | backend: `tiled` segments per page |
+| `EXTRACTION_TILE_MIN_WIDTH` | `1024` | backend: `tiled` segments are upscaled to this width (max 3x) |
+| `EXPORT_EXCLUDED_TEXT_TYPES` | `["sfx"]` | backend: text types left out of TXT/JSON exports and chapter context (still kept in review) |
 | `VITE_API_BASE_URL` | `http://localhost:8000` | frontend |
 
 All values are read from environment/`.env` — never hard-code them in
@@ -109,3 +115,14 @@ matters for future benchmarking (`docs/PRD.md` §15).
 - **A batch page fails repeatedly** — check `docs/PRD.md` §13.1 (retry
   policy): after 3 attempts a page becomes `status = manual_review`
   instead of blocking the rest of the batch.
+- **Pages come back with empty `texts`** — run
+  `python scripts/diagnose_text_extraction.py <page image> --legacy-json`
+  from `backend/`. It prints what is sent to the model, the raw answer vs.
+  the parsed texts, a crop test and a `tiled` run, and ends with a verdict
+  (see `docs/text-extraction-upgrade-plan-v2.md` §8). Pages whose answer
+  still looks like missed text after all retries are kept with
+  `review_flags` and show as `manual_review`. Saving a correction clears them.
+- **Comparing extraction strategies** — `POST /benchmark/run` with e.g.
+  `{"modes": ["original", "tiled"]}` reports text recall against the
+  ground truth in `tests/fixtures/**/expected.json`. Regenerate the synthetic
+  regression pages with `python tests/fixtures/generate_fixtures.py`.

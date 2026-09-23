@@ -20,6 +20,8 @@ dist-ssr/
 data/chapters/*
 data/results/*
 data/exports/*
+data/benchmarks/
+data/diagnostics/
 !data/chapters/.gitkeep
 !data/results/.gitkeep
 !data/exports/.gitkeep

@@ -102,6 +102,13 @@ class ChapterService:
 
         if has_norm:
             status = "done"
+            # Suspicious extraction kept after all retries: done, but needs review
+            flags = self._read_review_flags(norm_file)
+            if flags:
+                status = "manual_review"
+                error_msg = f"Needs review: {flags[0]}"
+                if len(flags) > 1:
+                    error_msg += f" (+{len(flags) - 1} more)"
         elif error_file.is_file():
             status = "manual_review"
             try:
@@ -113,6 +120,15 @@ class ChapterService:
             status = "pending"
 
         return status, has_raw, has_norm, error_msg
+
+    @staticmethod
+    def _read_review_flags(norm_file: Path) -> list[str]:
+        """Return the review flags stored in a normalized page result, if any."""
+        try:
+            flags = json.loads(norm_file.read_text(encoding="utf-8")).get("review_flags")
+        except Exception:
+            return []
+        return [str(f) for f in flags] if isinstance(flags, list) else []
 
     def create_chapter(self, payload: ChapterCreate) -> Chapter:
         """Create a chapter by discovering image pages from a source directory."""
@@ -355,9 +371,11 @@ class ChapterService:
         # Clear previous error state on successful manual correction
         self.clear_page_error(chapter_id, page_num)
 
-        # Persist normalized & user-corrected context
+        # Persist normalized & user-corrected context. A human save is the manual
+        # review, so it resolves any suspicious-extraction flags.
         context_data = page_context.model_dump()
         context_data["page"] = page_num
+        context_data["review_flags"] = []
         norm_file.write_text(
             json.dumps(context_data, indent=2, ensure_ascii=False),
             encoding="utf-8",

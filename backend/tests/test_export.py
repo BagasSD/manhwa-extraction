@@ -263,3 +263,72 @@ class TestExportAPI:
 
         res_txt = client.get("/chapters/unknown-id/export/txt")
         assert res_txt.status_code == 404
+
+
+@pytest.fixture
+def chapter_with_sfx(tmp_path: Path, mock_settings: Settings) -> str:
+    """One page mixing dialogue with SFX, like page 8 of a real export."""
+    img_dir = tmp_path / "sfx_pages"
+    img_dir.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (20, 20)).save(img_dir / "page_1.png", format="PNG")
+
+    chapter = ChapterService(settings=mock_settings).create_chapter(
+        ChapterCreate(id="ch-sfx", title="SFX Chapter", source_path=str(img_dir))
+    )
+    res_dir = mock_settings.RESULTS_DIR / chapter.id
+    res_dir.mkdir(parents=True, exist_ok=True)
+    (res_dir / "page-001.json").write_text(
+        json.dumps({
+            "page": 1,
+            "characters": [{"id": "c5", "description": "man with dark messy hair"}],
+            "texts": [
+                {"id": "t1", "text": "콰아", "type": "sfx", "order": 1},
+                {"id": "t2", "text": "...IS IT NOW MY TURN?", "speaker": "c5", "type": "speech", "order": 2},
+                {"id": "t3", "text": "슈욱", "type": "sfx", "order": 3},
+                {"id": "t4", "text": "THIS IS THE LAST TIME.", "speaker": "c5", "type": "thought", "order": 4},
+            ],
+            "scene": {"location": "desolate battlefield"},
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return chapter.id
+
+
+class TestExportExcludedTextTypes:
+    """SFX are left out of exports by default but stay in the stored page data."""
+
+    def test_txt_export_drops_sfx_and_renumbers(self, mock_settings: Settings, chapter_with_sfx: str):
+        txt = ExportService(settings=mock_settings).export_txt(chapter_with_sfx, save_to_file=False)
+
+        assert "슈욱" not in txt
+        assert "콰아" not in txt
+        assert "[sfx]" not in txt
+        assert '[1] c5\n"...IS IT NOW MY TURN?"' in txt
+        assert '[2] c5 [thought]\n"THIS IS THE LAST TIME."' in txt
+
+    def test_json_export_drops_sfx(self, mock_settings: Settings, chapter_with_sfx: str):
+        data = ExportService(settings=mock_settings).export_json(chapter_with_sfx, save_to_file=False)
+
+        texts = data["pages"][0]["context"]["texts"]
+        assert [t["text"] for t in texts] == ["...IS IT NOW MY TURN?", "THIS IS THE LAST TIME."]
+        assert data["excluded_text_types"] == ["sfx"]
+
+    def test_empty_exclusion_list_keeps_sfx(self, mock_settings: Settings, chapter_with_sfx: str):
+        settings = mock_settings.model_copy(update={"EXPORT_EXCLUDED_TEXT_TYPES": []})
+        txt = ExportService(settings=settings).export_txt(chapter_with_sfx, save_to_file=False)
+
+        assert '[3] Unknown [sfx]\n"슈욱"' in txt
+
+    def test_stored_page_keeps_sfx_for_review(self, mock_settings: Settings, chapter_with_sfx: str):
+        ExportService(settings=mock_settings).export_txt(chapter_with_sfx, save_to_file=True)
+        page = ChapterService(settings=mock_settings).get_page(chapter_with_sfx, 1)
+
+        assert "슈욱" in [t.text for t in page.context.texts]
+
+    def test_chapter_context_input_drops_sfx(self, mock_settings: Settings, chapter_with_sfx: str):
+        payload = ChapterContextService(settings=mock_settings).prepare_pages_payload(chapter_with_sfx)
+
+        assert [t["text"] for t in payload["pages"][0]["texts"]] == [
+            "...IS IT NOW MY TURN?",
+            "THIS IS THE LAST TIME.",
+        ]
