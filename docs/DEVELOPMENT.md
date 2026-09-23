@@ -58,6 +58,7 @@ running — this is the Phase 0 smoke test built into `src/App.tsx`.
 | `EXTRACTION_MAX_TEMPERATURE` | `0.2` | backend: temperature cap for page extraction |
 | `EXTRACTION_TILE_MAX_SEGMENTS` | `8` | backend: `tiled` segments per page |
 | `EXTRACTION_TILE_MIN_WIDTH` | `1024` | backend: `tiled` segments are upscaled to this width (max 3x) |
+| `EXPORT_EXCLUDED_TEXT_TYPES` | `["sfx"]` | backend: text types left out of TXT/JSON exports and chapter context (still kept in review) |
 | `VITE_API_BASE_URL` | `http://localhost:8000` | frontend |
 
 All values are read from environment/`.env` — never hard-code them in

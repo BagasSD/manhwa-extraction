@@ -107,6 +107,7 @@ class ChapterContextService:
         ]
 
         pages_payload: list[dict[str, Any]] = []
+        excluded_types = set(self.settings.EXPORT_EXCLUDED_TEXT_TYPES)
 
         # Find all page result JSON files
         page_files = sorted(
@@ -137,9 +138,11 @@ class ChapterContextService:
                         item["action"] = ch["action"]
                     compact_chars.append(item)
 
-                # Strip bboxes from texts
+                # Strip bboxes from texts; skip excluded types (e.g. SFX)
                 compact_texts = []
                 for tx in data.get("texts", []):
+                    if tx.get("type") in excluded_types:
+                        continue
                     item = {"text": tx.get("text")}
                     if tx.get("id"):
                         item["id"] = tx["id"]

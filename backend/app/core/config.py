@@ -73,6 +73,13 @@ class Settings(BaseSettings):
     EXTRACTION_TILE_MAX_SEGMENTS: int = 8
     EXTRACTION_TILE_MIN_WIDTH: int = 1024
 
+    # --- Downstream output ---
+    # Text types left out of the TXT/JSON exports and the chapter-context input
+    # (sound effects such as "슈욱" are noise for the external script writer).
+    # They are still extracted, stored and editable in the review UI; changing
+    # a region's type there brings it back. Env format: ["sfx"]; [] keeps all.
+    EXPORT_EXCLUDED_TEXT_TYPES: list[str] = ["sfx"]
+
 
 @lru_cache
 def get_settings() -> Settings:
