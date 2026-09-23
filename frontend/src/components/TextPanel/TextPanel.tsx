@@ -3,6 +3,9 @@ import type { SelectedRegion, TextRegion, TextRegionType } from "../../types/con
 
 interface TextPanelProps {
   texts: TextRegion[];
+  /** What the model reported about the page text, to tell "no text" from "unreadable". */
+  hasText?: boolean | null;
+  ocrConfidence?: "high" | "medium" | "low" | null;
   onChange: (texts: TextRegion[]) => void;
   selectedRegion: SelectedRegion | null;
   onSelectRegion: (region: SelectedRegion | null) => void;
@@ -21,6 +24,8 @@ const REGION_TYPES: { value: TextRegionType; label: string }[] = [
 
 export const TextPanel: React.FC<TextPanelProps> = ({
   texts,
+  hasText,
+  ocrConfidence,
   onChange,
   selectedRegion,
   onSelectRegion,
@@ -79,9 +84,18 @@ export const TextPanel: React.FC<TextPanelProps> = ({
         </button>
       </div>
 
+      {(hasText != null || ocrConfidence) && (
+        <div style={{ fontSize: "0.75rem", color: ocrConfidence === "low" ? "#c2410c" : "#64748b", marginBottom: "0.4rem" }}>
+          Model: {hasText == null ? "text not reported" : hasText ? "text visible" : "no text"}
+          {ocrConfidence ? ` · OCR confidence ${ocrConfidence}` : ""}
+        </div>
+      )}
+
       {texts.length === 0 && (
-        <div style={{ fontSize: "0.85rem", color: "#94a3b8", fontStyle: "italic", padding: "0.5rem 0" }}>
-          No text/dialogue regions detected on this page.
+        <div style={{ fontSize: "0.85rem", color: hasText ? "#c2410c" : "#94a3b8", fontStyle: "italic", padding: "0.5rem 0" }}>
+          {hasText
+            ? "The model saw text on this page but transcribed none. Add it manually or retry the page."
+            : "No text/dialogue regions detected on this page."}
         </div>
       )}
 

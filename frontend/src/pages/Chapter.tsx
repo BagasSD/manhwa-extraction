@@ -584,7 +584,20 @@ export const ChapterPage: React.FC<ChapterProps> = ({ chapterId, onBack }) => {
               <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>
                 ⚠ Extraction Needs Manual Review
               </div>
-              <div>{pageDetail.error_message || "Model output could not be automatically parsed."}</div>
+              {pageDetail.context?.review_flags?.length ? (
+                <>
+                  <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
+                    {pageDetail.context.review_flags.map((flag) => (
+                      <li key={flag}>{flag}</li>
+                    ))}
+                  </ul>
+                  <div style={{ marginTop: "0.4rem", fontSize: "0.8rem" }}>
+                    Check the text against the image. Saving corrections marks this page as reviewed.
+                  </div>
+                </>
+              ) : (
+                <div>{pageDetail.error_message || "Model output could not be automatically parsed."}</div>
+              )}
               <div style={{ marginTop: "0.5rem" }}>
                 <button
                   type="button"
@@ -616,6 +629,8 @@ export const ChapterPage: React.FC<ChapterProps> = ({ chapterId, onBack }) => {
 
           <TextPanel
             texts={context.texts}
+            hasText={context.has_text}
+            ocrConfidence={context.ocr_confidence}
             onChange={(texts) => setContext((c) => ({ ...c, texts }))}
             selectedRegion={selectedRegion}
             onSelectRegion={setSelectedRegion}

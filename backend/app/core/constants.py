@@ -20,6 +20,9 @@ TEXT_REGION_TYPES = (
     "uk",
 )
 
+# Model-reported legibility of a page's text (docs/text-extraction-upgrade-plan-v2.md §3)
+OCR_CONFIDENCE_LEVELS = ("high", "medium", "low")
+
 # Page processing statuses (used starting Phase 3/7)
 PAGE_STATUSES = (
     "pending",

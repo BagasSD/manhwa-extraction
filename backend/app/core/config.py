@@ -57,6 +57,22 @@ class Settings(BaseSettings):
     OLLAMA_VISUAL_TOKENS: int = 1120
     OLLAMA_TIMEOUT: float = 120.0
 
+    # --- Page extraction strategy (docs/text-extraction-upgrade-plan-v2.md) ---
+    # Default preprocessing for batch/single-page extraction. "tiled" splits tall
+    # pages into upscaled vertical segments; only make it the default after the
+    # benchmark shows it captures more text (PRD §15).
+    EXTRACTION_PREPROCESS_MODE: str = "original"
+    # Send the output JSON schema as Ollama `format` (structured outputs) instead
+    # of plain "json" mode, so the model cannot invent its own key names.
+    EXTRACTION_STRUCTURED_OUTPUT: bool = True
+    # Structured extraction is kept near-deterministic regardless of the global
+    # OLLAMA_TEMPERATURE.
+    EXTRACTION_MAX_TEMPERATURE: float = 0.2
+    # "tiled" preprocessing: cap on segments per page and the minimum segment
+    # width (narrower segments are upscaled, at most 3x).
+    EXTRACTION_TILE_MAX_SEGMENTS: int = 8
+    EXTRACTION_TILE_MIN_WIDTH: int = 1024
+
 
 @lru_cache
 def get_settings() -> Settings:

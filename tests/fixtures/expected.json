@@ -1,0 +1,62 @@
+{
+  "clean/page-001.png": {
+    "texts": [
+      "Don't leave!",
+      "Clean page — clear speech bubble"
+    ]
+  },
+  "clean/page-002.png": {
+    "texts": [
+      "Don't leave!",
+      "Clean page — narration box"
+    ]
+  },
+  "difficult/page-001.png": {
+    "texts": [
+      "Don't leave!",
+      "Difficult — low contrast"
+    ]
+  },
+  "difficult/page-002.png": {
+    "texts": [
+      "Don't leave!",
+      "Difficult — busy background"
+    ]
+  },
+  "small_text/page-001.png": {
+    "texts": [
+      "Don't leave!",
+      "Small text panel"
+    ]
+  },
+  "text_over_art/page-001.png": {
+    "texts": [
+      "Don't leave!",
+      "Text over detailed art"
+    ]
+  },
+  "multiple_characters/page-001.png": {
+    "texts": [
+      "Don't leave!",
+      "Multiple characters scene"
+    ]
+  },
+  "multiple_characters/page-002.png": {
+    "texts": [
+      "Don't leave!",
+      "Group shot"
+    ]
+  },
+  "no_dialogue/page-001.png": {
+    "texts": [
+      "Don't leave!",
+      "No dialogue — action panel"
+    ]
+  },
+  "sfx/page-001.png": {
+    "texts": [
+      "Don't leave!",
+      "SFX-heavy page"
+    ]
+  }
+}

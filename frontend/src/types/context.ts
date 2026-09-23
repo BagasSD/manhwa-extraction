@@ -59,6 +59,12 @@ export interface PageContext {
   texts: TextRegion[];
   scene: Scene;
   visual_summary?: string | null;
+  /** Model's claim that the page shows text (null = not reported). */
+  has_text?: boolean | null;
+  /** Model-reported legibility of the page text. */
+  ocr_confidence?: "high" | "medium" | "low" | null;
+  /** Suspicious-extraction warnings kept after all retries; cleared by saving a correction. */
+  review_flags?: string[];
 }
 
 export interface PageInfo {
@@ -170,7 +176,8 @@ export type PreprocessMode =
   | "enhanced"
   | "grayscale"
   | "contrast"
-  | "sharpen";
+  | "sharpen"
+  | "tiled";
 
 export interface BenchmarkRunRequest {
   modes?: PreprocessMode[];
@@ -189,6 +196,10 @@ export interface PageBenchmarkResult {
   has_scene: boolean;
   error?: string | null;
   raw_response_size: number;
+  expected_text_count?: number | null;
+  matched_text_count?: number | null;
+  text_recall?: number | null;
+  flagged?: boolean;
 }
 
 export interface ModeSummary {
@@ -203,6 +214,10 @@ export interface ModeSummary {
   avg_character_count: number;
   avg_text_count: number;
   retry_rate: number;
+  avg_text_recall?: number | null;
+  missed_text_pages?: number;
+  hallucinated_text_pages?: number;
+  flagged_pages?: number;
 }
 
 export interface BenchmarkRunResult {

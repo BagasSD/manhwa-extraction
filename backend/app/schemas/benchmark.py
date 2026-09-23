@@ -28,6 +28,7 @@ class PreprocessMode(str, Enum):
     GRAYSCALE = "grayscale"
     CONTRAST = "contrast"
     SHARPEN = "sharpen"
+    TILED = "tiled"  # split tall pages into upscaled vertical segments
 
 
 class BenchmarkStatus(str, Enum):
@@ -90,6 +91,26 @@ class PageBenchmarkResult(BaseModel):
         default=0,
         description="Raw response JSON byte size.",
     )
+    expected_text_count: int | None = Field(
+        default=None,
+        ge=0,
+        description="Ground-truth text count from the fixture's expected.json (None = no ground truth).",
+    )
+    matched_text_count: int | None = Field(
+        default=None,
+        ge=0,
+        description="Ground-truth texts found in the extracted texts.",
+    )
+    text_recall: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="matched / expected texts; None when the fixture has no expected texts.",
+    )
+    flagged: bool = Field(
+        default=False,
+        description="Result kept after all retries but flagged for manual review.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -119,6 +140,27 @@ class ModeSummary(BaseModel):
         le=1.0,
         description="Fraction of pages that needed more than one attempt.",
     )
+    avg_text_recall: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Mean text recall over fixtures with expected texts (None = no ground truth).",
+    )
+    missed_text_pages: int = Field(
+        default=0,
+        ge=0,
+        description="Fixtures with expected texts where no text was extracted (the empty-texts failure).",
+    )
+    hallucinated_text_pages: int = Field(
+        default=0,
+        ge=0,
+        description="Fixtures whose ground truth has no text but texts were extracted anyway.",
+    )
+    flagged_pages: int = Field(
+        default=0,
+        ge=0,
+        description="Pages kept after all retries but flagged for manual review.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -140,7 +182,7 @@ class BenchmarkRunResult(BaseModel):
     mode_summaries: list[ModeSummary] = Field(default_factory=list)
     recommended_mode: PreprocessMode | None = Field(
         default=None,
-        description="Mode with the best combination of validity rate and speed.",
+        description="Mode with the best text recall (when ground truth exists), then validity rate, then speed.",
     )
     errors: list[str] = Field(default_factory=list)
     extra: dict[str, Any] = Field(

@@ -1,0 +1,59 @@
+{
+  "long_narration.png": {
+    "texts": [
+      "The war had ended ten years ago, but the city never recovered.",
+      "Nobody remembered who fired first.",
+      "Only the ruins remained."
+    ],
+    "note": "long narration box"
+  },
+  "short_dialogue.png": {
+    "texts": [
+      "Wait!",
+      "Who are you?"
+    ],
+    "note": "two short speech bubbles"
+  },
+  "sfx_only.png": {
+    "texts": [
+      "BOOM!!"
+    ],
+    "note": "SFX only, no bubbles"
+  },
+  "no_text.png": {
+    "texts": [],
+    "note": "no text at all (must not hallucinate)"
+  },
+  "small_text.png": {
+    "texts": [
+      "Seoul, 3 years later",
+      "PHARMACY"
+    ],
+    "note": "small caption + sign"
+  },
+  "system_window.png": {
+    "texts": [
+      "[Quest Complete]",
+      "Reward: 300 EXP"
+    ],
+    "note": "system/UI window"
+  },
+  "tall_strip.png": {
+    "texts": [
+      "Did you hear that?",
+      "It came from the basement.",
+      "Meanwhile...",
+      "Stay behind me."
+    ],
+    "note": "tall 720x4200 webtoon strip (full-page downscale makes text illegible)"
+  },
+  "mixed.png": {
+    "texts": [
+      "Day 1.",
+      "EXIT",
+      "Let's go.",
+      "(I hope this works...)"
+    ],
+    "note": "narration + sign + speech + thought"
+  }
+}

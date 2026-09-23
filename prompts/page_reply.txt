@@ -1,7 +1,7 @@
-Re-check the provided manhwa page and return valid JSON.
+Re-check the provided manhwa page and return valid JSON with the same structure: has_text, characters, texts, scene, visual_summary, ocr_confidence.
 
 Focus on:
-- missing or incorrect text
+- missing or incorrect text: every visible text goes into "texts", word for word
 - OCR accuracy
 - text type
 - speaker
