@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Env files
+.env
+!.env.example
+
+# Data (generated at runtime, not source)
+data/chapters/*
+data/results/*
+data/exports/*
+!data/chapters/.gitkeep
+!data/results/.gitkeep
+!data/exports/.gitkeep
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+*.log

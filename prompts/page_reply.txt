@@ -1,0 +1,24 @@
+Re-check the provided manhwa page and return valid JSON.
+
+Focus on:
+- missing or incorrect text
+- OCR accuracy
+- text type
+- speaker
+- target
+- reading order
+- character consistency
+- expression
+- emotion
+- action
+- scene information
+
+Rules:
+- Use only visually supported information.
+- Do not invent unreadable text.
+- Do not invent names or events.
+- Do not translate text.
+- Use null when unknown.
+- Preserve uncertainty.
+- Do not explain reasoning.
+- Return JSON only.
