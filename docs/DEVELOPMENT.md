@@ -122,6 +122,13 @@ matters for future benchmarking (`docs/PRD.md` §15).
   (see `docs/text-extraction-upgrade-plan-v2.md` §8). Pages whose answer
   still looks like missed text after all retries are kept with
   `review_flags` and show as `manual_review`. Saving a correction clears them.
+- **Extract Image (panel crop)** — a second pipeline, fully local (no
+  Ollama, no tokens) and independent of context extraction. Flow: "Extract
+  Image" on the chapter page → auto-detect → Panel Review (fix boxes, save
+  each page) → "Crop All" → PNGs in `data/extractedImage/{chapter_id}/`.
+  Panel data lives in `data/results/{chapter_id}/panels/`. To check detection
+  on raw images, run `python scripts/preview_panels.py <folder>` from
+  `backend/`. See `docs/plan-fitur-panel-crop.md` §6.
 - **Comparing extraction strategies** — `POST /benchmark/run` with e.g.
   `{"modes": ["original", "tiled"]}` reports text recall against the
   ground truth in `tests/fixtures/**/expected.json`. Regenerate the synthetic

@@ -22,6 +22,7 @@ data/results/*
 data/exports/*
 data/benchmarks/
 data/diagnostics/
+data/extractedImage/
 !data/chapters/.gitkeep
 !data/results/.gitkeep
 !data/exports/.gitkeep

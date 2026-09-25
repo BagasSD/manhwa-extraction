@@ -18,6 +18,7 @@ from app.core.config import Settings, get_settings
 from app.models.chapter import Chapter, ChapterCreate, ChapterSummary
 from app.models.page import PageDetail, PageInfo
 from app.schemas.page_context import PageContext
+from app.services import panel_store
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +131,38 @@ class ChapterService:
             return []
         return [str(f) for f in flags] if isinstance(flags, list) else []
 
+    def _panel_info(self, chapter_id: str, page_num: int) -> tuple[str, int]:
+        """(panel_status, panel_count) of a page for the Extract Image pipeline."""
+        page_panels = panel_store.load_page_panels(self.results_dir, chapter_id, page_num)
+        return panel_store.page_panel_status(page_panels), len(page_panels.panels) if page_panels else 0
+
+    @staticmethod
+    def _pipeline_statuses(total: int, completed: int, panel_statuses: list[str]) -> dict[str, Any]:
+        """Chapter-level status of the two independent pipelines (context vs. image)."""
+        if completed == 0:
+            context_status = "not_started"
+        elif completed >= total:
+            context_status = "done"
+        else:
+            context_status = "extracting"
+
+        detected = sum(1 for s in panel_statuses if s != "none")
+        reviewed = sum(1 for s in panel_statuses if s in ("reviewed", "cropped"))
+        if detected == 0:
+            image_status = "not_started"
+        elif detected < total:
+            image_status = "detecting"
+        elif all(s == "cropped" for s in panel_statuses):
+            image_status = "cropped"
+        else:
+            image_status = "reviewing"
+        return {
+            "context_status": context_status,
+            "image_status": image_status,
+            "panel_detected_pages": detected,
+            "panel_reviewed_pages": reviewed,
+        }
+
     def create_chapter(self, payload: ChapterCreate) -> Chapter:
         """Create a chapter by discovering image pages from a source directory."""
         source_dir = Path(payload.source_path).resolve()
@@ -188,6 +221,7 @@ class ChapterService:
                 total = len(pages_data)
                 completed = 0
                 failed = 0
+                panel_statuses: list[str] = []
                 for p in pages_data:
                     p_num = p.get("page_number", 1)
                     st, _, has_norm, _ = self._get_page_status(chapter_id, p_num)
@@ -195,6 +229,7 @@ class ChapterService:
                         completed += 1
                     elif st in ("failed", "manual_review"):
                         failed += 1
+                    panel_statuses.append(self._panel_info(chapter_id, p_num)[0])
 
                 summaries.append(
                     ChapterSummary(
@@ -206,6 +241,7 @@ class ChapterService:
                         failed_pages=failed,
                         created_at=data.get("created_at", ""),
                         updated_at=data.get("updated_at", ""),
+                        **self._pipeline_statuses(total, completed, panel_statuses),
                     )
                 )
             except Exception as exc:
@@ -238,6 +274,7 @@ class ChapterService:
             elif status in ("failed", "manual_review") or p.get("status") in ("failed", "manual_review"):
                 status = "manual_review"
                 failed += 1
+            panel_status, panel_count = self._panel_info(chapter_id, p_num)
 
             pages.append(
                 PageInfo(
@@ -248,6 +285,8 @@ class ChapterService:
                     has_raw_result=has_raw,
                     has_normalized_result=has_norm,
                     error_message=error_msg,
+                    panel_status=panel_status,
+                    panel_count=panel_count,
                 )
             )
 
@@ -261,6 +300,7 @@ class ChapterService:
             created_at=data.get("created_at", ""),
             updated_at=data.get("updated_at", ""),
             pages=pages,
+            **self._pipeline_statuses(len(pages), completed, [pg.panel_status for pg in pages]),
         )
 
     def get_page(self, chapter_id: str, page_num: int) -> PageDetail:
@@ -427,6 +467,13 @@ class ChapterService:
                 except OSError as exc:
                     logger.warning(f"Failed to remove {f}: {exc}")
 
+        deleted_panels = panel_store.panels_path(self.results_dir, chapter_id, page_num)
+        if deleted_panels.is_file():
+            try:
+                deleted_panels.unlink()
+            except OSError as exc:
+                logger.warning(f"Failed to remove {deleted_panels}: {exc}")
+
         # 2. Optionally delete physical image file
         if delete_image_file:
             img_path = Path(target_page_entry.get("file_path", ""))
@@ -474,6 +521,20 @@ class ChapterService:
                     err_old.rename(err_new)
                 except OSError as exc:
                     logger.warning(f"Failed to rename {err_old} -> {err_new}: {exc}")
+
+            # Rename panel file (Extract Image pipeline) and update its page field
+            panels_old = panel_store.load_page_panels(self.results_dir, chapter_id, old_num)
+            if panels_old is not None:
+                try:
+                    panels_old.page = new_num
+                    # Crop file names carry the old page number: crop-all must run again
+                    panels_old.cropped_at = None
+                    for panel in panels_old.panels:
+                        panel.image_path = None
+                    panel_store.save_page_panels(self.results_dir, chapter_id, panels_old)
+                    panel_store.panels_path(self.results_dir, chapter_id, old_num).unlink()
+                except OSError as exc:
+                    logger.warning(f"Failed to renumber panels of page {old_num} -> {new_num}: {exc}")
 
             # Update page number in page metadata
             p["page_number"] = new_num

@@ -67,6 +67,8 @@ export interface PageContext {
   review_flags?: string[];
 }
 
+export type PanelPageStatus = "none" | "auto_detected" | "reviewed" | "cropped";
+
 export interface PageInfo {
   page_number: number;
   filename: string;
@@ -75,6 +77,9 @@ export interface PageInfo {
   has_raw_result: boolean;
   has_normalized_result: boolean;
   error_message?: string | null;
+  /** Extract Image pipeline state of this page. */
+  panel_status?: PanelPageStatus;
+  panel_count?: number;
 }
 
 export interface PageDetail extends PageInfo {
@@ -91,6 +96,11 @@ export interface ChapterSummary {
   failed_pages: number;
   created_at: string;
   updated_at: string;
+  /** Two independent pipelines: context (Gemma, cloud) and image (local panel crop). */
+  context_status?: "not_started" | "extracting" | "done";
+  image_status?: "not_started" | "detecting" | "reviewing" | "cropped";
+  panel_detected_pages?: number;
+  panel_reviewed_pages?: number;
 }
 
 export interface Chapter extends ChapterSummary {
@@ -235,3 +245,51 @@ export interface BenchmarkRunResult {
   extra?: Record<string, unknown>;
 }
 
+
+/* ---------- Extract Image (panel detection + crop) ---------- */
+
+export interface Panel {
+  panel_index: number;
+  /** [ymin, xmin, ymax, xmax] in original-image pixels. */
+  bbox: number[];
+  status: "auto_detected" | "reviewed";
+  image_path: string | null;
+}
+
+export interface PagePanels {
+  page: number;
+  image_width: number;
+  image_height: number;
+  status: "auto_detected" | "reviewed";
+  panels: Panel[];
+  updated_at: string;
+  cropped_at: string | null;
+}
+
+export interface PanelDetectionStatus {
+  chapter_id: string;
+  status: "idle" | "running" | "completed" | "failed";
+  total_pages: number;
+  processed_pages: number;
+  detected_pages: number;
+  skipped_pages: number;
+  failed_pages: number;
+  current_page: number | null;
+  message: string | null;
+  error: string | null;
+}
+
+export interface CropAllResult {
+  chapter_id: string;
+  output_dir: string;
+  total_crops: number;
+  pages_cropped: number;
+  files: string[];
+}
+
+export interface ExtractedImage {
+  filename: string;
+  page: number;
+  crop_index: number;
+  size_bytes: number;
+}

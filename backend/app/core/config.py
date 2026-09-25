@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     CHAPTERS_DIR: Path = PROJECT_ROOT / "data" / "chapters"
     RESULTS_DIR: Path = PROJECT_ROOT / "data" / "results"
     EXPORTS_DIR: Path = PROJECT_ROOT / "data" / "exports"
+    # Cropped panels from the "Extract Image" pipeline, one folder per chapter
+    EXTRACTED_IMAGE_DIR: Path = PROJECT_ROOT / "data" / "extractedImage"
     PROMPTS_DIR: Path = PROJECT_ROOT / "prompts"
 
     # --- Ollama configuration ---

@@ -33,13 +33,15 @@ import { ChapterContextModal } from "../components/ChapterContext/ChapterContext
 import { TextPanel } from "../components/TextPanel/TextPanel";
 import { ScenePanel } from "../components/ScenePanel/ScenePanel";
 import { ReviewToolbar } from "../components/ReviewToolbar/ReviewToolbar";
+import { ExtractImageBar } from "../components/ExtractImageBar/ExtractImageBar";
 
 interface ChapterProps {
   chapterId: string;
   onBack: () => void;
+  onOpenPanelReview: () => void;
 }
 
-export const ChapterPage: React.FC<ChapterProps> = ({ chapterId, onBack }) => {
+export const ChapterPage: React.FC<ChapterProps> = ({ chapterId, onBack, onOpenPanelReview }) => {
   const [chapter, setChapter] = useState<Chapter | null>(null);
   const [currentPageNumber, setCurrentPageNumber] = useState<number>(1);
   const [pageDetail, setPageDetail] = useState<PageDetail | null>(null);
@@ -414,7 +416,8 @@ export const ChapterPage: React.FC<ChapterProps> = ({ chapterId, onBack }) => {
       >
         <div style={{ display: "flex", alignItems: "center", gap: "1rem", flex: 1, maxWidth: "60%" }}>
           <div style={{ fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap" }}>
-            Batch: {completedCount}/{chapter.total_pages} pages ({progressPercent}%)
+            Extract Context <span style={{ fontWeight: 400, color: "#64748b" }}>(Gemma, cloud)</span>:{" "}
+            {completedCount}/{chapter.total_pages} pages ({progressPercent}%)
             {failedCount > 0 && (
               <span style={{ color: "#ea580c", marginLeft: "0.5rem" }}>
                 ({failedCount} review needed)
@@ -486,7 +489,7 @@ export const ChapterPage: React.FC<ChapterProps> = ({ chapterId, onBack }) => {
                   }}
                   title="Extract all pending pages"
                 >
-                  {completedCount === 0 ? "⚡ Extract All Pages" : "▶ Resume Batch"}
+                  {completedCount === 0 ? "⚡ Extract Context" : "▶ Resume Context"}
                 </button>
               )}
 
@@ -513,6 +516,9 @@ export const ChapterPage: React.FC<ChapterProps> = ({ chapterId, onBack }) => {
           )}
         </div>
       </div>
+
+      {/* Second, independent pipeline: panel detection + crop (local) */}
+      <ExtractImageBar chapter={chapter} onOpenReview={onOpenPanelReview} onRefreshChapter={fetchChapterData} />
 
       {/* Main 3-Column Review Layout */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
