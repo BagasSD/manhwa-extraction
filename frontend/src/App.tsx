@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getHealth, type HealthResponse } from "./services/api";
 import Home from "./pages/Home";
 import ChapterPage from "./pages/Chapter";
+import PanelReviewView from "./pages/PanelReviewView";
 
 type BackendStatus =
   | { state: "checking" }
@@ -11,6 +12,9 @@ type BackendStatus =
 function App() {
   const [backend, setBackend] = useState<BackendStatus>({ state: "checking" });
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
+  // Chapter screens: text/context review or the separate panel (Extract Image) review
+  const [chapterView, setChapterView] = useState<"context" | "panels">("context");
+  const openPanelReview = useCallback(() => setChapterView("panels"), []);
 
   useEffect(() => {
     getHealth()
@@ -20,11 +24,21 @@ function App() {
       );
   }, []);
 
+  if (selectedChapterId && chapterView === "panels") {
+    return (
+      <PanelReviewView
+        chapterId={selectedChapterId}
+        onBack={() => setChapterView("context")}
+      />
+    );
+  }
+
   if (selectedChapterId) {
     return (
       <ChapterPage
         chapterId={selectedChapterId}
         onBack={() => setSelectedChapterId(null)}
+        onOpenPanelReview={openPanelReview}
       />
     );
   }
@@ -53,7 +67,12 @@ function App() {
         </span>
       </div>
 
-      <Home onSelectChapter={(id) => setSelectedChapterId(id)} />
+      <Home
+        onSelectChapter={(id) => {
+          setChapterView("context");
+          setSelectedChapterId(id);
+        }}
+      />
     </div>
   );
 }

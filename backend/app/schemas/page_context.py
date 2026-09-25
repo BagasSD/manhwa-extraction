@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -53,3 +53,30 @@ class PageContext(BaseModel):
             return None
         v_clean = v.strip().lower()
         return v_clean if v_clean in OCR_CONFIDENCE_LEVELS else None
+
+
+class Panel(BaseModel):
+    """A comic panel on a page, used by the "Extract Image" pipeline.
+
+    Kept apart from TextRegion/Character: panels come from local OpenCV
+    detection plus manual review, never from the vision model, and are stored
+    in their own file (see app/services/panel_store.py).
+    """
+
+    panel_index: int = Field(..., ge=1, description="Reading-order position on the page (1-based)")
+    bbox: list[int] = Field(..., description="[ymin, xmin, ymax, xmax] in original-image pixels")
+    status: Literal["auto_detected", "reviewed"] = "auto_detected"
+    image_path: str | None = Field(None, description="Cropped PNG, set once crop-all has run")
+
+    @field_validator("bbox", mode="before")
+    @classmethod
+    def validate_bbox(cls, v: Any) -> list[int]:
+        if not isinstance(v, (list, tuple)) or len(v) != 4:
+            raise ValueError("Panel bbox must be [ymin, xmin, ymax, xmax]")
+        try:
+            ymin, xmin, ymax, xmax = (int(round(float(x))) for x in v)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Panel bbox coordinates must be numbers") from exc
+        if min(ymin, xmin) < 0 or ymax <= ymin or xmax <= xmin:
+            raise ValueError(f"Panel bbox is empty or negative: {list(v)}")
+        return [ymin, xmin, ymax, xmax]

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from app.models.page import PageInfo
@@ -36,6 +36,16 @@ class ChapterSummary(BaseModel):
     total_pages: int = Field(0, description="Total number of discovered pages")
     completed_pages: int = Field(0, description="Number of successfully extracted pages")
     failed_pages: int = Field(0, description="Number of failed pages")
+    # Two independent pipelines (docs/plan-fitur-panel-crop.md §1.3)
+    context_status: Literal["not_started", "extracting", "done"] = Field(
+        "not_started", description="Context extraction (Gemma): not_started, extracting (partial), done"
+    )
+    image_status: Literal["not_started", "detecting", "reviewing", "cropped"] = Field(
+        "not_started",
+        description="Extract Image: not_started, detecting (some pages lack panels), reviewing, cropped",
+    )
+    panel_detected_pages: int = Field(0, description="Pages with panel data")
+    panel_reviewed_pages: int = Field(0, description="Pages whose panels a human reviewed")
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 

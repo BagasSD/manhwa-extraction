@@ -6,10 +6,14 @@ import type {
   Chapter,
   ChapterContext,
   ChapterSummary,
+  CropAllResult,
+  ExtractedImage,
   KnownCharacter,
   PageContext,
   PageDetail,
   PageInfo,
+  PagePanels,
+  PanelDetectionStatus,
 } from "../types/context";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -323,5 +327,93 @@ export async function getBenchmarkResult(runId: string): Promise<BenchmarkRunRes
     throw new Error(errorData.detail || `Failed to get benchmark result: ${response.statusText}`);
   }
   return response.json();
+}
+
+/* ---------- Extract Image (panel detection + crop, 100% local) ---------- */
+
+export async function startPanelDetection(
+  chapterId: string,
+  payload: { pages?: number[]; overwrite_reviewed?: boolean } = {},
+): Promise<PanelDetectionStatus> {
+  const response = await fetch(`${API_BASE_URL}/chapters/${chapterId}/detect-panels`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Failed to start panel detection: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getPanelDetectionStatus(chapterId: string): Promise<PanelDetectionStatus> {
+  const response = await fetch(`${API_BASE_URL}/chapters/${chapterId}/detect-panels/status`);
+  if (!response.ok) {
+    throw new Error(`Failed to get panel detection status: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+/** Panels of a page, or null when the page has not been detected yet. */
+export async function getPagePanels(chapterId: string, pageNum: number): Promise<PagePanels | null> {
+  const response = await fetch(`${API_BASE_URL}/chapters/${chapterId}/pages/${pageNum}/panels`);
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Failed to get panels for page ${pageNum}: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function savePagePanels(
+  chapterId: string,
+  pageNum: number,
+  bboxes: number[][],
+): Promise<PagePanels> {
+  const response = await fetch(`${API_BASE_URL}/chapters/${chapterId}/pages/${pageNum}/panels`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ panels: bboxes.map((bbox) => ({ bbox })) }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Failed to save panels: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+/** Thrown by cropAllPanels while some pages are not reviewed (HTTP 409). */
+export class PanelsNotReviewedError extends Error {
+  unreviewedPages: number[];
+
+  constructor(message: string, unreviewedPages: number[]) {
+    super(message);
+    this.unreviewedPages = unreviewedPages;
+  }
+}
+
+export async function cropAllPanels(chapterId: string): Promise<CropAllResult> {
+  const response = await fetch(`${API_BASE_URL}/chapters/${chapterId}/crop-all`, { method: "POST" });
+  if (response.status === 409) {
+    const data = await response.json().catch(() => ({}));
+    throw new PanelsNotReviewedError(data.detail || "Some pages are not reviewed", data.unreviewed_pages || []);
+  }
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Crop all failed: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function listExtractedImages(chapterId: string): Promise<ExtractedImage[]> {
+  const response = await fetch(`${API_BASE_URL}/chapters/${chapterId}/extracted-images`);
+  if (!response.ok) {
+    throw new Error(`Failed to list extracted images: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export function getExtractedImageUrl(chapterId: string, filename: string): string {
+  return `${API_BASE_URL}/chapters/${chapterId}/extracted-images/${encodeURIComponent(filename)}`;
 }
 
