@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import benchmark, chapters, export, extraction, health, pages, panels
+from app.api.routes import benchmark, chapters, export, extraction, health, multi_extract, pages, panels
 from app.core.config import get_settings
 
 
@@ -34,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(chapters.router)
     app.include_router(pages.router)
     app.include_router(extraction.router)
+    app.include_router(multi_extract.router)
     app.include_router(export.router)
     app.include_router(benchmark.router)
     app.include_router(panels.router)

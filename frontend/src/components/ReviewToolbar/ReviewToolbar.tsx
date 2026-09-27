@@ -19,6 +19,10 @@ interface ReviewToolbarProps {
   onBack: () => void;
   onPrevPage: () => void;
   onNextPage: () => void;
+  onPrevChapter?: () => void;
+  onNextChapter?: () => void;
+  hasPrevChapter?: boolean;
+  hasNextChapter?: boolean;
 }
 
 
@@ -41,6 +45,10 @@ export const ReviewToolbar: React.FC<ReviewToolbarProps> = ({
   onBack,
   onPrevPage,
   onNextPage,
+  onPrevChapter,
+  onNextChapter,
+  hasPrevChapter = false,
+  hasNextChapter = false,
 }) => {
 
   return (
@@ -326,6 +334,61 @@ export const ReviewToolbar: React.FC<ReviewToolbarProps> = ({
         >
           ›
         </button>
+
+        {/* Chapter navigation separator + buttons */}
+        {(onPrevChapter || onNextChapter) && (
+          <>
+            <span
+              style={{
+                width: "1px",
+                height: "18px",
+                backgroundColor: "#475569",
+                margin: "0 2px",
+              }}
+            />
+            <button
+              type="button"
+              onClick={onPrevChapter}
+              disabled={!hasPrevChapter}
+              style={{
+                backgroundColor: "#1e3a5f",
+                color: "#93c5fd",
+                border: "1px solid #1d4ed8",
+                borderRadius: "4px",
+                padding: "4px 8px",
+                cursor: !hasPrevChapter ? "not-allowed" : "pointer",
+                opacity: !hasPrevChapter ? 0.4 : 1,
+                fontWeight: "bold",
+                fontSize: "0.82rem",
+              }}
+              title="Previous Chapter"
+            >
+              «
+            </button>
+            <span style={{ fontSize: "0.75rem", color: "#94a3b8", whiteSpace: "nowrap" }}>
+              Ch
+            </span>
+            <button
+              type="button"
+              onClick={onNextChapter}
+              disabled={!hasNextChapter}
+              style={{
+                backgroundColor: "#1e3a5f",
+                color: "#93c5fd",
+                border: "1px solid #1d4ed8",
+                borderRadius: "4px",
+                padding: "4px 8px",
+                cursor: !hasNextChapter ? "not-allowed" : "pointer",
+                opacity: !hasNextChapter ? 0.4 : 1,
+                fontWeight: "bold",
+                fontSize: "0.82rem",
+              }}
+              title="Next Chapter"
+            >
+              »
+            </button>
+          </>
+        )}
       </div>
     </header>
   );

@@ -39,9 +39,21 @@ interface ChapterProps {
   chapterId: string;
   onBack: () => void;
   onOpenPanelReview: () => void;
+  onPrevChapter?: () => void;
+  onNextChapter?: () => void;
+  hasPrevChapter?: boolean;
+  hasNextChapter?: boolean;
 }
 
-export const ChapterPage: React.FC<ChapterProps> = ({ chapterId, onBack, onOpenPanelReview }) => {
+export const ChapterPage: React.FC<ChapterProps> = ({
+  chapterId,
+  onBack,
+  onOpenPanelReview,
+  onPrevChapter,
+  onNextChapter,
+  hasPrevChapter = false,
+  hasNextChapter = false,
+}) => {
   const [chapter, setChapter] = useState<Chapter | null>(null);
   const [currentPageNumber, setCurrentPageNumber] = useState<number>(1);
   const [pageDetail, setPageDetail] = useState<PageDetail | null>(null);
@@ -296,11 +308,13 @@ export const ChapterPage: React.FC<ChapterProps> = ({ chapterId, onBack, onOpenP
           texts: [],
           scene: { location: null, situation: null, actions: [], mood: null },
         });
-      } else {
-        const nextPage = Math.min(pageNum, updatedChapter.pages.length);
-        setCurrentPageNumber(nextPage);
-        await loadCurrentPage(nextPage);
+      } else if (pageNum === currentPageNumber) {
+        // Deleted page was the active one — jump to first remaining page
+        const firstRemaining = updatedChapter.pages[0].page_number;
+        setCurrentPageNumber(firstRemaining);
+        await loadCurrentPage(firstRemaining);
       }
+      // Otherwise stay on current page — its number didn't change
       await fetchRoster();
     } catch (err) {
       alert(`Gagal menghapus halaman: ${(err as Error).message}`);
@@ -399,6 +413,10 @@ export const ChapterPage: React.FC<ChapterProps> = ({ chapterId, onBack, onOpenP
         onBack={onBack}
         onPrevPage={() => setCurrentPageNumber((p) => Math.max(p - 1, 1))}
         onNextPage={() => setCurrentPageNumber((p) => Math.min(p + 1, chapter.total_pages))}
+        onPrevChapter={onPrevChapter}
+        onNextChapter={onNextChapter}
+        hasPrevChapter={hasPrevChapter}
+        hasNextChapter={hasNextChapter}
       />
 
 

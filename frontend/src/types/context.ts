@@ -142,6 +142,33 @@ export interface BatchJobStatus {
   error: string | null;
 }
 
+export interface MultiChapterExtractRequest {
+  chapter_ids: string[];
+  skip_completed?: boolean;
+  force_all?: boolean;
+  max_retries_per_page?: number;
+}
+
+export interface MultiChapterJobStatus {
+  job_id: string;
+  status: "idle" | "running" | "completed" | "cancelled" | "failed";
+  chapter_ids: string[];
+  current_chapter_id: string | null;
+  current_chapter_index: number;
+  total_chapters: number;
+  current_page: number | null;
+  total_pages_current_chapter: number;
+  processed_chapters: number;
+  completed_chapters: number;
+  failed_chapters: number;
+  total_pages_processed: number;
+  total_pages_completed: number;
+  message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  error: string | null;
+}
+
 export interface ChapterCharacterContext {
   id: string;
   name?: string | null;

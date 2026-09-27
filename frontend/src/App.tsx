@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { getHealth, type HealthResponse } from "./services/api";
+import { getHealth, listChapters, type HealthResponse } from "./services/api";
+import type { ChapterSummary } from "./types/context";
 import Home from "./pages/Home";
 import ChapterPage from "./pages/Chapter";
 import PanelReviewView from "./pages/PanelReviewView";
@@ -12,6 +13,7 @@ type BackendStatus =
 function App() {
   const [backend, setBackend] = useState<BackendStatus>({ state: "checking" });
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
+  const [chapters, setChapters] = useState<ChapterSummary[]>([]);
   // Chapter screens: text/context review or the separate panel (Extract Image) review
   const [chapterView, setChapterView] = useState<"context" | "panels">("context");
   const openPanelReview = useCallback(() => setChapterView("panels"), []);
@@ -23,6 +25,36 @@ function App() {
         setBackend({ state: "error", message: (err as Error).message }),
       );
   }, []);
+
+  // Keep chapters list fresh so prev/next chapter nav works everywhere
+  const refreshChapters = useCallback(async () => {
+    try {
+      const data = await listChapters();
+      setChapters(data);
+    } catch {
+      // silently ignore; chapter list is best-effort for nav purposes
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshChapters();
+  }, [refreshChapters]);
+
+  // Derive prev/next chapter ids from the sorted chapters list
+  const currentChapterIndex = chapters.findIndex((c) => c.id === selectedChapterId);
+  const prevChapterId = currentChapterIndex > 0 ? chapters[currentChapterIndex - 1].id : null;
+  const nextChapterId =
+    currentChapterIndex >= 0 && currentChapterIndex < chapters.length - 1
+      ? chapters[currentChapterIndex + 1].id
+      : null;
+
+  const navigateToChapter = useCallback(
+    (id: string) => {
+      setChapterView("context");
+      setSelectedChapterId(id);
+    },
+    [],
+  );
 
   if (selectedChapterId && chapterView === "panels") {
     return (
@@ -39,6 +71,10 @@ function App() {
         chapterId={selectedChapterId}
         onBack={() => setSelectedChapterId(null)}
         onOpenPanelReview={openPanelReview}
+        onPrevChapter={prevChapterId ? () => navigateToChapter(prevChapterId) : undefined}
+        onNextChapter={nextChapterId ? () => navigateToChapter(nextChapterId) : undefined}
+        hasPrevChapter={prevChapterId !== null}
+        hasNextChapter={nextChapterId !== null}
       />
     );
   }
@@ -59,7 +95,7 @@ function App() {
         }}
       >
         <span>
-          Backend:{" "}
+          Backend{" "}
           {backend.state === "checking" && "connecting..."}
           {backend.state === "ok" &&
             `connected (${backend.data.app}, env=${backend.data.env})`}
@@ -71,6 +107,7 @@ function App() {
         onSelectChapter={(id) => {
           setChapterView("context");
           setSelectedChapterId(id);
+          refreshChapters();
         }}
       />
     </div>

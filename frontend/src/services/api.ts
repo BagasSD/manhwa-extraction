@@ -9,6 +9,8 @@ import type {
   CropAllResult,
   ExtractedImage,
   KnownCharacter,
+  MultiChapterExtractRequest,
+  MultiChapterJobStatus,
   PageContext,
   PageDetail,
   PageInfo,
@@ -226,6 +228,41 @@ export async function getBatchStatus(chapterId: string): Promise<BatchJobStatus>
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.detail || `Failed to get batch status: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function startMultiChapterExtraction(
+  payload: MultiChapterExtractRequest
+): Promise<MultiChapterJobStatus> {
+  const response = await fetch(`${API_BASE_URL}/multi-extract`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Failed to start multi-chapter extraction: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getMultiExtractStatus(): Promise<MultiChapterJobStatus> {
+  const response = await fetch(`${API_BASE_URL}/multi-extract/status`);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Failed to get multi-extract status: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function cancelMultiExtraction(): Promise<MultiChapterJobStatus> {
+  const response = await fetch(`${API_BASE_URL}/multi-extract/cancel`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Failed to cancel multi-extract: ${response.statusText}`);
   }
   return response.json();
 }

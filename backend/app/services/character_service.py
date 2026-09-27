@@ -289,3 +289,41 @@ class CharacterService:
         )
 
         return known
+
+    def save_roster_from_dict(self, chapter_id: str, known_characters: dict[str, str]) -> None:
+        """Persist an accumulated known_characters dict (id → description/name) into a chapter's
+        characters.json, merging with any existing roster entries so that prior metadata
+        (names, first_seen_page, pages list) is preserved where available.
+
+        Used by MultiChapterBatchService to propagate the shared cross-chapter roster
+        back into every participating chapter after a bulk-OCR run.
+        """
+        chapter_res_dir = self.results_dir / chapter_id
+        chapter_res_dir.mkdir(parents=True, exist_ok=True)
+
+        # Load existing roster as a base
+        existing_known = self.get_known_characters(chapter_id)
+        existing_map: dict[str, dict] = {k.id: k.model_dump() for k in existing_known}
+
+        # Merge in every character from the shared dict
+        for cid, desc in known_characters.items():
+            if cid not in existing_map:
+                existing_map[cid] = {
+                    "id": cid,
+                    "name": None,
+                    "description": desc if desc != "character" else None,
+                    "first_seen_page": 1,
+                    "occurrences": 0,
+                    "pages": [],
+                }
+            else:
+                # Fill in description if still missing
+                if not existing_map[cid].get("description") and desc and desc != "character":
+                    existing_map[cid]["description"] = desc
+
+        roster_file = self._get_roster_file(chapter_id)
+        roster_file.write_text(
+            json.dumps(list(existing_map.values()), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        logger.info(f"Saved shared roster ({len(existing_map)} chars) to chapter '{chapter_id}'")

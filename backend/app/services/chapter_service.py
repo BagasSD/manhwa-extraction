@@ -424,7 +424,7 @@ class ChapterService:
         return self.get_page(chapter_id, page_num)
 
     def delete_page(self, chapter_id: str, page_num: int, delete_image_file: bool = False) -> Chapter:
-        """Delete a single page from chapter and renumber remaining pages.
+        """Delete a single page from chapter without renumbering remaining pages.
 
         Args:
             chapter_id: ID of the chapter.
@@ -483,63 +483,7 @@ class ChapterService:
                 except OSError as exc:
                     logger.warning(f"Failed to unlink image {img_path}: {exc}")
 
-        # 3. Shift result files for subsequent pages
-        # Renumber in ascending order
-        for p in pages[target_idx + 1:]:
-            old_num = p["page_number"]
-            new_num = old_num - 1
-
-            old_prefix = f"page-{old_num:03d}"
-            new_prefix = f"page-{new_num:03d}"
-
-            # Rename normalized context and update internal page field
-            norm_old = chapter_res_dir / f"{old_prefix}.json"
-            norm_new = chapter_res_dir / f"{new_prefix}.json"
-            if norm_old.is_file():
-                try:
-                    pdata = json.loads(norm_old.read_text(encoding="utf-8"))
-                    pdata["page"] = new_num
-                    norm_new.write_text(json.dumps(pdata, indent=2, ensure_ascii=False), encoding="utf-8")
-                    norm_old.unlink()
-                except Exception as exc:
-                    logger.warning(f"Failed to rename {norm_old} -> {norm_new}: {exc}")
-
-            # Rename raw file
-            raw_old = chapter_res_dir / f"{old_prefix}.raw.json"
-            raw_new = chapter_res_dir / f"{new_prefix}.raw.json"
-            if raw_old.is_file():
-                try:
-                    raw_old.rename(raw_new)
-                except OSError as exc:
-                    logger.warning(f"Failed to rename {raw_old} -> {raw_new}: {exc}")
-
-            # Rename error file
-            err_old = chapter_res_dir / f"{old_prefix}.error.json"
-            err_new = chapter_res_dir / f"{new_prefix}.error.json"
-            if err_old.is_file():
-                try:
-                    err_old.rename(err_new)
-                except OSError as exc:
-                    logger.warning(f"Failed to rename {err_old} -> {err_new}: {exc}")
-
-            # Rename panel file (Extract Image pipeline) and update its page field
-            panels_old = panel_store.load_page_panels(self.results_dir, chapter_id, old_num)
-            if panels_old is not None:
-                try:
-                    panels_old.page = new_num
-                    # Crop file names carry the old page number: crop-all must run again
-                    panels_old.cropped_at = None
-                    for panel in panels_old.panels:
-                        panel.image_path = None
-                    panel_store.save_page_panels(self.results_dir, chapter_id, panels_old)
-                    panel_store.panels_path(self.results_dir, chapter_id, old_num).unlink()
-                except OSError as exc:
-                    logger.warning(f"Failed to renumber panels of page {old_num} -> {new_num}: {exc}")
-
-            # Update page number in page metadata
-            p["page_number"] = new_num
-
-        # 4. Remove deleted page from chapter pages list
+        # 3. Remove deleted page from chapter pages list — no renumbering
         pages.pop(target_idx)
         data["pages"] = pages
         data["total_pages"] = len(pages)

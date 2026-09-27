@@ -46,6 +46,7 @@ export const Home: React.FC<HomeProps> = ({ onSelectChapter }) => {
         onSelectChapter={onSelectChapter}
         onCreateChapter={handleCreateChapter}
         onDownloadChapter={handleDownloadChapter}
+        onRefresh={fetchChapters}
         loading={loading}
       />
     </div>
